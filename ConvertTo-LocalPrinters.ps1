@@ -12,39 +12,50 @@
 
  function ConvertTo-LocalPrinters
  {
-     [CmdletBinding()]
-     [Alias()]
-     [OutputType([int])]
+ 
+     [CmdletBinding(SupportsShouldProcess=$True,ConfirmImpact='Medium')]
      Param
      (
 
-         # None
+         # Computername
          [Parameter(Mandatory=$false,
                     ValueFromPipelineByPropertyName=$true,
                     Position=1)]
-         $none
+         $Computername
 
 
      )
 
-
-    $printers = get-printer
+    if ($Computername) 
+    {
+        $printers = get-printer -ComputerName $Computername
+    }
+    else
+    {
+        $printers = get-printer
+    }
 
     foreach ($printer in $printers)
     {
         if ($printer.type -eq "Connection")
         {
-            Write-Host "Detected"$printer.Name"at share"$printer.ComputerName"\"$printer.ShareName
+            Write-Verbose ("Detected" + $printer.Name + "at share" + $printer.ComputerName + "\"+ $printer.ShareName)
             $printerPort=Get-PrinterPort -Name $printer.PortName -ComputerName $printer.ComputerName
-            Write-Host "PortName:"$printerPort.Name"->"$printerPort.PrinterHostAddress":"$printerPort.PortNumber
+            Write-Verbose ("PortName:" + $printerPort.Name + "->" + $printerPort.PrinterHostAddress + ":" + $printerPort.PortNumber)
             $printerDriver = Get-PrinterDriver -Name $printer.DriverName
-            Write-Host "using driver:"$printerDriver.Name
+            Write-Verbose ("using driver:" + $printerDriver.Name)
             $printerPortName="IP_"+$printerPort.Name
-            Write-Host "adding local Printer Port: $printerPortName"
-            Add-PrinterPort -Name $printerPortName -PrinterHostAddress $printerPort.PrinterHostAddress
-            Write-Host "installing local Printer --> Name:"$printer.ShareName"with driver:"$printerDriver.Name
-            Add-Printer -name $printer.ShareName -drivername $printerDriver.Name -port $printerPortName
-            Write-Host "-----------------------------------------------------------------------------------------------------------------------------------------------------"
+
+            if ($PSCmdlet.ShouldProcess($printerPortName,"add port")) {
+                Write-Verbose ("adding local Printer Port:" + $printerPortName)
+                Add-PrinterPort -Name $printerPortName -PrinterHostAddress $printerPort.PrinterHostAddress
+            }
+            
+            if ($PSCmdlet.ShouldProcess($printer.ShareName,"install printer")) {
+                Write-Host ("installing local Printer --> Name: " + $printer.ShareName + " with driver: " + $printerDriver.Name + " on port 1" + $printerPortName)
+                Add-Printer -name $printer.ShareName -drivername $printerDriver.Name -port $printerPortName
+            }
+            Write-Verbose ("-----------------------------------------------------------------------------------------------------------------------------------------------------")
         }
         
     }
